@@ -32,16 +32,17 @@ button:focus-visible,a:focus-visible,th:focus-visible,tr:focus-visible{outline:2
 .kpi b{display:block;font:700 30px/1.05 var(--title);font-variant-numeric:tabular-nums}
 .kpi span{color:var(--muted);font-size:13px}
 .tablebox{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
-table{border-collapse:separate;border-spacing:0;width:100%;min-width:560px}
-th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:0}
+th,td{padding:10px 8px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
 th{font:600 14px var(--body);color:var(--muted);cursor:pointer;user-select:none;position:sticky;top:0;background:var(--card)}
 th.num,td.num{text-align:right;font-variant-numeric:tabular-nums}
 td:first-child,th:first-child{position:sticky;left:0;background:var(--card);z-index:1}
 tbody tr:last-child td{border-bottom:0}
 tr.row{cursor:pointer} tr.row:hover td{background:color-mix(in srgb,var(--sea) 8%,var(--card))}
-.team{font:600 21px/1 var(--title);letter-spacing:.3px}
+.team{font:600 19px/1 var(--title);letter-spacing:.3px;display:block;max-width:96px;overflow:hidden;text-overflow:ellipsis}
 .empty{color:var(--muted);font-style:italic}
-.bar{height:6px;border-radius:3px;background:var(--line);margin-top:5px;min-width:90px;overflow:hidden}
+td.wrapcell{white-space:normal;position:static}
+.bar{height:6px;border-radius:3px;background:var(--line);margin-top:5px;min-width:70px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--good)}
 .free{font:700 22px/1 var(--title)}
 .c-good{color:var(--good)} .c-warn{color:var(--warn)} .c-bad{color:var(--bad)}
@@ -192,10 +193,10 @@ function listView(){
   const arrow = key => sortState.key===key ? (sortState.dir>0?" ↑":" ↓") : "";
   const rows = teams.map(t=>`<tr class="row" tabindex="0" data-team="${esc(t.name)}">
     <td><span class="team">${esc(t.name)}</span></td>
-    <td class="num">${t.n}<span class="empty"> / ${CONFIG.rosterMax}</span></td>
     <td class="num">${fmt(t.spent)} M</td>
-    <td class="num"><span class="free c-${level(t.free)}">${fmt(t.free)} M</span>${bar(t)}</td></tr>`).join("");
-  const placeholders = open>0 ? `<tr><td colspan="4" class="empty">${open} equipos aún sin nombre: aparecerán aquí cuando el nombre figure en la columna OWNER del Sheet.</td></tr>` : "";
+    <td class="num"><span class="free c-${level(t.free)}">${fmt(t.free)} M</span>${bar(t)}</td>
+    <td class="num">${t.n}<span class="empty"> / ${CONFIG.rosterMax}</span></td></tr>`).join("");
+  const placeholders = open>0 ? `<tr><td colspan="4" class="empty wrapcell">${open} equipos aún sin nombre: aparecerán aquí cuando el nombre figure en la columna OWNER del Sheet.</td></tr>` : "";
   return `
   <div class="kpis">
     <div class="kpi"><b>${teams.length} / ${CONFIG.teams}</b><span>Equipos con nombre</span></div>
@@ -203,8 +204,8 @@ function listView(){
     <div class="kpi"><b>${fmt(CONFIG.cap,0)} M</b><span>Cap por equipo</span></div>
   </div>
   <div class="tablebox"><table><thead><tr>
-    <th data-sort="name">Equipo${arrow("name")}</th><th class="num" data-sort="n">Jugadores${arrow("n")}</th>
-    <th class="num" data-sort="spent">Salarios${arrow("spent")}</th><th class="num" data-sort="free">Libre${arrow("free")}</th>
+    <th data-sort="name">Equipo${arrow("name")}</th><th class="num" data-sort="spent">Salarios${arrow("spent")}</th><th class="num" data-sort="free">Libre${arrow("free")}</th>
+    <th class="num" data-sort="n">Jugad.${arrow("n")}</th>
   </tr></thead><tbody>${rows}${placeholders}</tbody></table></div>
   <div class="note">Toca un equipo para ver su plantilla. Pulsa las cabeceras para ordenar.</div>`;
 }
@@ -232,7 +233,7 @@ function teamView(name){
   <div class="tablebox"><table><thead><tr>
     <th data-psort="name">Jugador${arrow("name")}</th><th data-psort="letra">Pos.${arrow("letra")}</th>
     <th class="num" data-psort="sal">Salario${arrow("sal")}</th><th class="num" data-psort="years">Años${arrow("years")}</th>
-  </tr></thead><tbody>${rows||`<tr><td colspan="4" class="empty">Aún no hay jugadores drafteados.</td></tr>`}</tbody>
+  </tr></thead><tbody>${rows||`<tr><td colspan="4" class="empty wrapcell">Aún no hay jugadores drafteados.</td></tr>`}</tbody>
   <tfoot><tr><td>Total</td><td></td><td class="num">${fmt(t.spent)} M</td><td></td></tr></tfoot></table></div>`;
 }
 

@@ -27,8 +27,16 @@ h1{font:700 40px/1 var(--title);letter-spacing:.5px;margin:0}
 .sub{color:var(--muted);font-size:14px;margin-top:4px}
 button,.btn{font:600 15px var(--body);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 12px;cursor:pointer}
 button:focus-visible,a:focus-visible,th:focus-visible,tr:focus-visible{outline:2px solid var(--sea);outline-offset:2px}
+#q{width:100%;font:500 16px var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 14px;margin-bottom:12px}
+#q:focus{outline:2px solid var(--sea);outline-offset:1px}
+.pos{display:block;color:var(--muted);font-size:12px}
+a.tl{color:var(--sea-d);font-weight:600;text-decoration:none;display:inline-block;max-width:100px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom}
+.libre{display:inline-block;font:600 12px var(--body);padding:2px 8px;border-radius:99px;color:var(--good);border:1px solid var(--good)}
+th.nosort{cursor:default}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpilink{text-decoration:none;color:inherit;border-color:var(--sea);cursor:pointer}
+.kpilink:hover{background:color-mix(in srgb,var(--sea) 8%,var(--card))}
 .kpi b{display:block;font:700 30px/1.05 var(--title);font-variant-numeric:tabular-nums}
 .kpi span{color:var(--muted);font-size:13px}
 .tablebox{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow-x:auto}
@@ -41,6 +49,7 @@ tbody tr:last-child td{border-bottom:0}
 tr.row{cursor:pointer} tr.row:hover td{background:color-mix(in srgb,var(--sea) 8%,var(--card))}
 .team{font:600 19px/1 var(--title);letter-spacing:.3px;display:block;max-width:96px;overflow:hidden;text-overflow:ellipsis}
 .empty{color:var(--muted);font-style:italic}
+td.pname{white-space:normal;min-width:120px}
 td.wrapcell{white-space:normal;position:static}
 .bar{height:6px;border-radius:3px;background:var(--line);margin-top:5px;min-width:70px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--good)}
@@ -67,6 +76,7 @@ tfoot td{font-weight:600;background:color-mix(in srgb,var(--sea) 7%,var(--card))
     <div><h1>DM10 · Draft</h1><div class="sub" id="status">Cargando…</div></div>
     <button id="reload" title="Recargar datos">Actualizar</button>
   </header>
+  <input id="q" type="search" placeholder="Buscar jugador…" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Buscar jugador">
   <main id="app"></main>
 </div>
 <script>
@@ -89,7 +99,7 @@ const esc = s => String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">"
 const num = v => { if(v==null||v==="")return null; const n=typeof v==="number"?v:parseFloat(String(v).replace(",",".")); return isNaN(n)?null:n; };
 const isNamed = o => { const t=String(o??"").trim(); return t!=="" && t!=="?"; };
 
-let players = [], source = "", sortState = {key:"free",dir:1}, playerSort = {key:"sal",dir:-1};
+let query = "", players = [], source = "", sortState = {key:"free",dir:1}, playerSort = {key:"sal",dir:-1};
 
 function fromSnapshot(){
   return SNAPSHOT.map(r=>({tipo:r[0],name:r[1],fppg:r[2],letra:r[3],edad:r[4],sal:r[5],years:r[6],owner:r[7]}));
@@ -199,7 +209,7 @@ function listView(){
   const placeholders = open>0 ? `<tr><td colspan="4" class="empty wrapcell">${open} equipos aún sin nombre: aparecerán aquí cuando el nombre figure en la columna OWNER del Sheet.</td></tr>` : "";
   return `
   <div class="kpis">
-    <div class="kpi"><b>${teams.length} / ${CONFIG.teams}</b><span>Equipos con nombre</span></div>
+    <a class="kpi kpilink" href="#libres"><b>${players.filter(p=>!isNamed(p.owner)).length}</b><span>Jugadores libres ›</span></a>
     <div class="kpi"><b>${drafted}</b><span>Jugadores drafteados</span></div>
     <div class="kpi"><b>${fmt(CONFIG.cap,0)} M</b><span>Cap por equipo</span></div>
   </div>
@@ -210,19 +220,55 @@ function listView(){
   <div class="note">Toca un equipo para ver su plantilla. Pulsa las cabeceras para ordenar.</div>`;
 }
 
+function psorted(list){
+  const k = playerSort.key, d = playerSort.dir;
+  return [...list].sort((a,b)=>{
+    const x = (k==="name"||k==="letra")?String(a[k]||""):(a[k]??-1), y = (k==="name"||k==="letra")?String(b[k]||""):(b[k]??-1);
+    return ((k==="name"||k==="letra")?x.localeCompare(y,"es"):x-y)*d;
+  });
+}
+function phead(first){
+  const arrow = key => playerSort.key===key ? (playerSort.dir>0?" ↑":" ↓") : "";
+  return `<tr><th data-psort="name">${first}${arrow("name")}</th><th data-psort="letra">Pos.${arrow("letra")}</th>
+    <th class="num" data-psort="sal">Salario${arrow("sal")}</th><th class="num" data-psort="years">Años${arrow("years")}</th></tr>`;
+}
+function prows(list){
+  return list.map(p=>`<tr><td class="pname">${esc(p.name)}</td><td>${esc(p.letra||"")}</td>
+    <td class="num">${fmt(p.sal||0)} M</td>
+    <td class="num"><span class="badge y${p.years}">${p.years??"–"}</span></td></tr>`).join("");
+}
+
+const norm = s => String(s??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+
+function searchView(){
+  const toks = norm(query).split(/\s+/).filter(Boolean);
+  const hits = players.filter(p=>{ const n=norm(p.name); return toks.every(t=>n.includes(t)); });
+  const first = norm(query).trim();
+  hits.sort((a,b)=>{ const x=norm(a.name).startsWith(first)?0:1, y=norm(b.name).startsWith(first)?0:1; return x-y || String(a.name).localeCompare(String(b.name),"es"); });
+  const shown = hits.slice(0,100);
+  const rows = shown.map(p=>`<tr><td class="pname">${esc(p.name)}<span class="pos">${esc(p.letra||"")}</span></td>
+    <td>${isNamed(p.owner)?`<a class="tl" href="#team=${encodeURIComponent(String(p.owner).trim())}">${esc(String(p.owner).trim())}</a>`:`<span class="libre">Libre</span>`}</td>
+    <td class="num">${fmt(p.sal||0)} M</td>
+    <td class="num"><span class="badge y${p.years}">${p.years??"–"}</span></td></tr>`).join("");
+  return `<div class="sub" style="margin-bottom:8px">${hits.length} resultado${hits.length===1?"":"s"}${hits.length>100?" · mostrando los 100 primeros, afina la búsqueda":""}</div>
+  <div class="tablebox"><table><thead><tr><th class="nosort">Jugador</th><th class="nosort">Equipo</th><th class="num nosort">Salario</th><th class="num nosort">Años</th></tr></thead>
+  <tbody>${rows||`<tr><td colspan="4" class="empty wrapcell">Ningún jugador encontrado.</td></tr>`}</tbody></table></div>`;
+}
+
+function freeView(){
+  const free = players.filter(p=>!isNamed(p.owner));
+  return `<a class="btn back" href="#">‹ Todos los equipos</a>
+  <div class="head"><h2>Jugadores libres</h2>
+    <div class="big">${free.length} <span class="sub">sin equipo</span></div></div>
+  <div class="tablebox"><table><thead>${phead("Jugador")}</thead>
+  <tbody>${prows(psorted(free))||`<tr><td colspan="4" class="empty wrapcell">No quedan jugadores libres.</td></tr>`}</tbody></table></div>`;
+}
+
 function teamView(name){
   const t = teamsData().find(x=>x.name===name);
   if(!t) return `<a class="btn back" href="#">‹ Todos los equipos</a><p class="empty">Equipo no encontrado.</p>`;
-  const k = playerSort.key, d = playerSort.dir;
-  const list = [...t.players].sort((a,b)=>{
-    const x = k==="name"?String(a.name):(a[k]??-1), y = k==="name"?String(b.name):(b[k]??-1);
-    return (k==="name"?x.localeCompare(y,"es"):x-y)*d;
-  });
-  const arrow = key => playerSort.key===key ? (playerSort.dir>0?" ↑":" ↓") : "";
-  const rows = list.map(p=>`<tr>
-    <td>${esc(p.name)}</td><td>${esc(p.letra||"")}</td>
-    <td class="num">${fmt(p.sal||0)} M</td>
-    <td class="num"><span class="badge y${p.years}">${p.years??"–"}</span></td></tr>`).join("");
+  const list = psorted(t.players);
+  const rows = prows(list);
   const warn = t.n>CONFIG.rosterMax ? `<div class="warnbox">Más de ${CONFIG.rosterMax} jugadores en la plantilla.</div>` : t.free<0 ? `<div class="warnbox">Cap superado en ${fmt(-t.free)} M.</div>` : "";
   return `<a class="btn back" href="#">‹ Todos los equipos</a>
   <div class="head"><h2>${esc(t.name)}</h2>
@@ -230,16 +276,13 @@ function teamView(name){
     ${bar(t,10)}
     <div class="meta"><span>${t.n} de ${CONFIG.rosterMax} jugadores${t.n<CONFIG.rosterMin?` (mínimo ${CONFIG.rosterMin})`:""}</span><span>Salarios ${fmt(t.spent)} M</span></div>${warn}
   </div>
-  <div class="tablebox"><table><thead><tr>
-    <th data-psort="name">Jugador${arrow("name")}</th><th data-psort="letra">Pos.${arrow("letra")}</th>
-    <th class="num" data-psort="sal">Salario${arrow("sal")}</th><th class="num" data-psort="years">Años${arrow("years")}</th>
-  </tr></thead><tbody>${rows||`<tr><td colspan="4" class="empty wrapcell">Aún no hay jugadores drafteados.</td></tr>`}</tbody>
+  <div class="tablebox"><table><thead>${phead("Jugador")}</thead><tbody>${rows||`<tr><td colspan="4" class="empty wrapcell">Aún no hay jugadores drafteados.</td></tr>`}</tbody>
   <tfoot><tr><td>Total</td><td></td><td class="num">${fmt(t.spent)} M</td><td></td></tr></tfoot></table></div>`;
 }
 
 function render(){
   const h = decodeURIComponent(location.hash.slice(1));
-  $("#app").innerHTML = h.startsWith("team=") ? teamView(h.slice(5)) : listView();
+  $("#app").innerHTML = query.trim() ? searchView() : h.startsWith("team=") ? teamView(h.slice(5)) : h==="libres" ? freeView() : listView();
   $("#status").textContent = source;
 }
 
@@ -251,7 +294,8 @@ document.addEventListener("click",e=>{
   else if(row){ location.hash = "team="+encodeURIComponent(row.dataset.team); }
 });
 document.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const row=e.target.closest&&e.target.closest("tr[data-team]"); if(row) location.hash="team="+encodeURIComponent(row.dataset.team);} });
-window.addEventListener("hashchange",()=>{render();window.scrollTo(0,0);});
+window.addEventListener("hashchange",()=>{ query=""; $("#q").value=""; render(); window.scrollTo(0,0); });
+$("#q").addEventListener("input",e=>{ query=e.target.value; render(); });
 $("#reload").addEventListener("click",load);
 load();
 </script>
